@@ -20,16 +20,16 @@ OMEGA_EARTH = 7.292115900231276e-5  # [rad/s] Earth's rotation rate
 
 
 # =========================================================
-# DEFAULT VALUES
+# DEFAULT VALUES - NEOSSATO
 # =========================================================
 DEFAULTS = {
     # Orbital elements
-    "sma_km": 7000.0,
-    "ecc": 0.001,
-    "inc_deg": 45.0,
-    "raan_deg": 0.0,
-    "aop_deg": 0.0,
-    "ta_deg": 0.0,
+    "sma_km": 7157.35,
+    "ecc": 0.00225,
+    "inc_deg": 98.27,
+    "raan_deg": 296.02,
+    "aop_deg": 66.69,
+    "ta_deg": 289.10,
 
     # Epoch
     "epoch_date": date.today(),
@@ -38,13 +38,13 @@ DEFAULTS = {
     "epoch_second": 0,
 
     # Physical / geometrical properties
-    "mass_kg": 72,
-    "area_m2": 1.0,
+    "mass_kg": 72.0,
+    "area_m2": 0.991,
     "cd": 2.2,
 
     # Propagation settings
     "prop_model": "Simple Two Body",
-    "time_max_days": 1.0,
+    "time_max_days": 2.0,
 }
 
 
@@ -62,22 +62,22 @@ def init_session_state():
     if "orbit_result" not in st.session_state:
         st.session_state.orbit_result = None
 
+    if "comparison_result" not in st.session_state:
+        st.session_state.comparison_result = None
+
     if "error_message" not in st.session_state:
         st.session_state.error_message = None
 
     if "right_panel_view" not in st.session_state:
         st.session_state.right_panel_view = "orbit"
-
-
 def reset_all():
     for key, value in DEFAULTS.items():
         st.session_state[key] = value
 
     st.session_state.run_pressed = False
     st.session_state.orbit_result = None
+    st.session_state.comparison_result = None
     st.session_state.error_message = None
-
-
 def collect_user_inputs():
     """Read all current inputs from Streamlit session state."""
     return {
@@ -97,8 +97,6 @@ def collect_user_inputs():
         "prop_model": st.session_state.prop_model,
         "time_max_days": st.session_state.time_max_days,
     }
-
-
 def validate_orbit_geometry(sma_km, ecc):
     """
     Check that the perigee radius is larger than the Earth radius.
@@ -178,8 +176,6 @@ def state_vector_from_COE(kepler_elements):
     v_ECI = L @ v_pqw
 
     return r_ECI, v_ECI
-
-
 def COE_from_state_vector(r_ECI, v_ECI, tol=1e-10):
     """
     Converts a position and velocity state vector in the ECI frame
@@ -267,8 +263,6 @@ def COE_from_state_vector(r_ECI, v_ECI, tol=1e-10):
     TA_deg = to_deg_360(TA)
 
     return a, e, i_deg, RAAN_deg, AOP_deg, TA_deg
-
-
 def TBP(t, Y):
     """
     Two-Body Problem equations of motion in ECI coordinates.
@@ -298,8 +292,6 @@ def TBP(t, Y):
     dvzdt = -MU_EARTH * rz / r**3
 
     return np.array([drxdt, drydt, drzdt, dvxdt, dvydt, dvzdt])
-
-
 def exponential_atmospheric_model(r_ECI):
     """
     Computes the atmospheric density at a given position using an exponential atmospheric model.
@@ -335,8 +327,6 @@ def exponential_atmospheric_model(r_ECI):
         raise ValueError(f"No atmospheric match found for altitude: {h_ellp:.2f} km")
 
     return rho
-
-
 def perturbed_TBP(t, Y, ballistic_coeff, perturbations):
     """
     Computes the derivatives of position and velocity under central gravity
@@ -390,8 +380,6 @@ def perturbed_TBP(t, Y, ballistic_coeff, perturbations):
     dvzdt = -MU_EARTH * rz / r**3 + acc[2]
 
     return np.array([drxdt, drydt, drzdt, dvxdt, dvydt, dvzdt])
-
-
 def propagate_orbit(user_inputs):
     """
     Build the initial state from the user inputs and propagate the orbit.
@@ -463,7 +451,7 @@ def propagate_orbit(user_inputs):
     elif 1.0 < n_day < 7.0:
         dt = 60.0
     else:
-        dt = 300.0
+        dt = 120.0
 
     t_eval = np.arange(0.0, t_max + dt, dt)
 
@@ -499,8 +487,8 @@ def propagate_orbit(user_inputs):
         t_eval=t_eval,
         y0=Y0,
         method="DOP853",
-        rtol=1e-9,
-        atol=1e-9,
+        rtol=1e-10,
+        atol=1e-10,
     )
 
     if not sol.success:
@@ -569,10 +557,9 @@ def compute_orbital_histories(r, v):
 # PLOTTING HELPERS
 # =========================================================
 def build_empty_plot():
-    fig = plt.figure(figsize=(8, 8))
+    fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111, projection="3d")
 
-    # Labels and aesthetics
     ax.set_box_aspect([1, 1, 1])
     ax.axis("equal")
     ax.set_title("Satellite Orbit in ECI")
@@ -591,7 +578,7 @@ def build_empty_plot():
 
 
 def build_placeholder_result_plot(title):
-    fig, ax = plt.subplots(figsize=(4, 3))
+    fig, ax = plt.subplots(figsize=(6, 4))
     ax.set_title(title)
     ax.grid(True)
     ax.set_xticks([])
@@ -608,15 +595,14 @@ def build_placeholder_result_plot(title):
 
 
 def build_orbit_figure(r):
-    fig = plt.figure(figsize=(8, 8))
+    fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111, projection="3d")
 
-    # Orbit
     ax.plot(
         r[:, 0], r[:, 1], r[:, 2],
         label="Propagated Orbit",
         color="red",
-        linewidth=1
+        linewidth=0.1
     )
     ax.scatter(
         r[0, 0], r[0, 1], r[0, 2],
@@ -625,7 +611,6 @@ def build_orbit_figure(r):
         label="Satellite Initial State"
     )
 
-    # Earth sphere / ECI basis
     ax.quiver(0, 0, 0, 2000, 0, 0, color="blue", linewidth=0.8, arrow_length_ratio=0.2)
     ax.quiver(0, 0, 0, 0, 2000, 0, color="blue", linewidth=0.8, arrow_length_ratio=0.2)
     ax.quiver(0, 0, 0, 0, 0, 2000, color="blue", linewidth=0.8, arrow_length_ratio=0.2)
@@ -634,7 +619,6 @@ def build_orbit_figure(r):
     ax.text(0, 0, 2000 * 1.05, r"$\hat{\mathbf{K}}$", color="blue", fontsize=12)
     ax.scatter(0, 0, 0, color="blue", s=50, marker="o")
 
-    # Labels and aesthetics
     ax.set_box_aspect([1, 1, 1])
     ax.axis("equal")
     ax.set_title("Satellite Orbit in ECI")
@@ -653,10 +637,33 @@ def build_orbit_figure(r):
     return fig
 
 
-def build_time_history_plot(t_dates, y, title, ylabel):
-    fig, ax = plt.subplots(figsize=(4.8, 3.2))
+def build_time_history_plot(
+    t_dates,
+    y_main,
+    title,
+    ylabel,
+    y_ref=None,
+    main_label="Selected model",
+    ref_label="Simple Two Body",
+):
+    fig, ax = plt.subplots(figsize=(6, 4))
 
-    ax.plot(t_dates, y, linewidth=0.9)
+    if y_ref is not None:
+        ax.plot(
+            t_dates,
+            y_ref,
+            linewidth=0.9,
+            linestyle="--",
+            label=ref_label
+        )
+
+    ax.plot(
+        t_dates,
+        y_main,
+        linewidth=1.0,
+        label=main_label
+    )
+
     ax.set_title(title)
     ax.set_ylabel(ylabel)
     ax.grid(True)
@@ -667,15 +674,52 @@ def build_time_history_plot(t_dates, y, title, ylabel):
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%d-%b\n%H:%M"))
     ax.margins(x=0.01)
 
+    if y_ref is not None:
+        ax.legend()
+
     fig.tight_layout()
     return fig
 
 
-def build_rp_ra_plot(t_dates, rp_list, ra_list):
-    fig, ax = plt.subplots(figsize=(4.8, 3.2))
+def build_rp_ra_plot(
+    t_dates,
+    rp_main,
+    ra_main,
+    rp_ref=None,
+    ra_ref=None,
+    main_label_suffix="Selected model",
+    ref_label_suffix="Simple Two Body",
+):
+    fig, ax = plt.subplots(figsize=(6, 4))
 
-    ax.plot(t_dates, rp_list, linewidth=0.9, label=r"$r_p$ [km]")
-    ax.plot(t_dates, ra_list, linewidth=0.9, label=r"$r_a$ [km]")
+    if rp_ref is not None and ra_ref is not None:
+        ax.plot(
+            t_dates,
+            rp_ref,
+            linewidth=0.9,
+            linestyle="--",
+            label=rf"$r_p$ ({ref_label_suffix}) [km]"
+        )
+        ax.plot(
+            t_dates,
+            ra_ref,
+            linewidth=0.9,
+            linestyle="--",
+            label=rf"$r_a$ ({ref_label_suffix}) [km]"
+        )
+
+    ax.plot(
+        t_dates,
+        rp_main,
+        linewidth=1.0,
+        label=rf"$r_p$ ({main_label_suffix}) [km]"
+    )
+    ax.plot(
+        t_dates,
+        ra_main,
+        linewidth=1.0,
+        label=rf"$r_a$ ({main_label_suffix}) [km]"
+    )
 
     ax.set_title("Perigee and Apogee Radius")
     ax.set_ylabel("Radius [km]")
@@ -703,7 +747,7 @@ init_session_state()
 
 st.title("Satellite Propagation")
 
-left_col, right_col = st.columns([1, 2], gap="large")
+left_col, right_col = st.columns([1, 1.75], gap="large")
 
 
 # =========================================================
@@ -860,6 +904,7 @@ with left_col:
                 min_value=0.1,
                 max_value=100000.0,
                 step=0.1,
+                value=DEFAULTS.get("mass_kg"),
                 key="mass_kg",
             )
 
@@ -868,6 +913,7 @@ with left_col:
                 min_value=0.001,
                 max_value=1000.0,
                 step=0.001,
+                value=DEFAULTS.get("area_m2"),
                 key="area_m2",
             )
 
@@ -876,6 +922,7 @@ with left_col:
                 min_value=0.0,
                 max_value=5.0,
                 step=0.1,
+                value=DEFAULTS.get("cd"),
                 key="cd",
                 help="Drag coefficient. Suggested value: 2.2",
             )
@@ -925,13 +972,21 @@ if propagate_clicked:
         user_inputs = collect_user_inputs()
         result = propagate_orbit(user_inputs)
 
+        comparison_result = None
+        if user_inputs["prop_model"] != "Simple Two Body":
+            comparison_inputs = user_inputs.copy()
+            comparison_inputs["prop_model"] = "Simple Two Body"
+            comparison_result = propagate_orbit(comparison_inputs)
+
         st.session_state.orbit_result = result
+        st.session_state.comparison_result = comparison_result
         st.session_state.run_pressed = True
         st.session_state.error_message = None
         st.session_state.right_panel_view = "orbit"
 
     except Exception as exc:
         st.session_state.orbit_result = None
+        st.session_state.comparison_result = None
         st.session_state.run_pressed = False
         st.session_state.error_message = str(exc)
 
@@ -955,6 +1010,7 @@ with right_col:
         if st.button("RESULTS PLOT", use_container_width=True):
             st.session_state.right_panel_view = "results"
 
+
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
     # -------------------------------------------------
@@ -971,8 +1027,8 @@ with right_col:
             fig = build_empty_plot()
             st.pyplot(fig)
         else:
-            row1 = st.columns(3)
-            row2 = st.columns(3)
+            row1 = st.columns(2)
+            row2 = st.columns(2)
 
             titles = [
                 "Semi-major axis",
@@ -987,15 +1043,13 @@ with right_col:
                 st.pyplot(build_placeholder_result_plot(titles[0]))
             with row1[1]:
                 st.pyplot(build_placeholder_result_plot(titles[1]))
-            with row1[2]:
-                st.pyplot(build_placeholder_result_plot(titles[2]))
 
             with row2[0]:
-                st.pyplot(build_placeholder_result_plot(titles[3]))
+                st.pyplot(build_placeholder_result_plot(titles[2]))
             with row2[1]:
-                st.pyplot(build_placeholder_result_plot(titles[4]))
-            with row2[2]:
-                st.pyplot(build_placeholder_result_plot(titles[5]))
+                st.pyplot(build_placeholder_result_plot(titles[3]))
+
+
 
     # -------------------------------------------------
     # Propagated result available
@@ -1016,12 +1070,24 @@ with right_col:
             col3.metric("Final radius norm [km]", f"{np.linalg.norm(r[-1]):.2f}")
 
         elif st.session_state.right_panel_view == "results":
-            row1 = st.columns(3)
-            row2 = st.columns(3)
+            row1 = st.columns(2)
+            row2 = st.columns(2)
+            row3 = st.columns(2)
 
             histories = compute_orbital_histories(r, v)
             epoch_dt = build_epoch_datetime(inputs)
             t_dates = [epoch_dt + timedelta(seconds=float(ti)) for ti in t]
+
+            comparison_result = st.session_state.comparison_result
+            comparison_histories = None
+
+            if comparison_result is not None:
+                r_ref = comparison_result["r"]
+                v_ref = comparison_result["v"]
+                comparison_histories = compute_orbital_histories(r_ref, v_ref)
+
+            main_label = inputs["prop_model"]
+            ref_label = "Simple Two Body"
 
             with row1[0]:
                 st.pyplot(
@@ -1030,6 +1096,9 @@ with right_col:
                         histories["a_list"],
                         "Semi-major axis",
                         "SMA [km]",
+                        y_ref=comparison_histories["a_list"] if comparison_histories is not None else None,
+                        main_label=main_label,
+                        ref_label=ref_label,
                     )
                 )
 
@@ -1040,16 +1109,9 @@ with right_col:
                         histories["e_list"],
                         "Eccentricity",
                         "ECC [-]",
-                    )
-                )
-
-            with row1[2]:
-                st.pyplot(
-                    build_time_history_plot(
-                        t_dates,
-                        histories["i_list"],
-                        "Inclination",
-                        "INC [deg]",
+                        y_ref=comparison_histories["e_list"] if comparison_histories is not None else None,
+                        main_label=main_label,
+                        ref_label=ref_label,
                     )
                 )
 
@@ -1057,9 +1119,12 @@ with right_col:
                 st.pyplot(
                     build_time_history_plot(
                         t_dates,
-                        histories["RAAN_list"],
-                        "RAAN",
-                        "RAAN [deg]",
+                        histories["i_list"],
+                        "Inclination",
+                        "INC [deg]",
+                        y_ref=comparison_histories["i_list"] if comparison_histories is not None else None,
+                        main_label=main_label,
+                        ref_label=ref_label,
                     )
                 )
 
@@ -1067,17 +1132,37 @@ with right_col:
                 st.pyplot(
                     build_time_history_plot(
                         t_dates,
-                        histories["AOP_list"],
-                        "Argument of Perigee",
-                        "AOP [deg]",
+                        histories["RAAN_list"],
+                        "RAAN",
+                        "RAAN [deg]",
+                        y_ref=comparison_histories["RAAN_list"] if comparison_histories is not None else None,
+                        main_label=main_label,
+                        ref_label=ref_label,
                     )
                 )
 
-            with row2[2]:
+            with row3[0]:
+                st.pyplot(
+                    build_time_history_plot(
+                        t_dates,
+                        histories["AOP_list"],
+                        "Argument of Perigee",
+                        "AOP [deg]",
+                        y_ref=comparison_histories["AOP_list"] if comparison_histories is not None else None,
+                        main_label=main_label,
+                        ref_label=ref_label,
+                    )
+                )
+
+            with row3[1]:
                 st.pyplot(
                     build_rp_ra_plot(
                         t_dates,
                         histories["rp_list"],
                         histories["ra_list"],
+                        rp_ref=comparison_histories["rp_list"] if comparison_histories is not None else None,
+                        ra_ref=comparison_histories["ra_list"] if comparison_histories is not None else None,
+                        main_label_suffix=main_label,
+                        ref_label_suffix=ref_label,
                     )
                 )
