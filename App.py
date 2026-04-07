@@ -1160,7 +1160,7 @@ with left_col:
         st.number_input(
             "SMA [km]",
             min_value=6578.0,
-            max_value=10000.0,
+            max_value=36000.0,
             step=1.0,
             key="sma_km",
             help="Semimajor axis. Allowed range: 6578.0 to 10000.0 km.",
